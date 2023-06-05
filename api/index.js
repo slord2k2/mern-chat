@@ -130,6 +130,31 @@ const server = app.listen(3000, () => {
 // read username and id form the cookie for this connection
 const wss = new ws.WebSocketServer({ server });
 wss.on("connection", (connection, req) => {
+	function notifyAboutOnlinePeople(){
+		[...wss.clients].forEach((client) => {
+			client.send(
+				JSON.stringify({
+					online: [...wss.clients].map((c) => ({
+						userId: c.userId,
+						username: c.username,
+					})),
+				})
+			);
+		});
+	}
+	connection.isAlive = true;
+	connection.timer=setInterval(() => {
+			connection.ping();
+			connection.deathTimer=setTimeout(() => {
+				connection.isAlive=false;
+				connection.terminate();
+				notifyAboutOnlinePeople();
+			},1000)
+	},3000)
+	connection.on('pong',()=>{
+		clearTimeout(connection.deathTimer);
+	})
+
 	const cookie = req.headers.cookie;
 	if (cookie) {
 		const tokenCookieString = cookie
@@ -173,14 +198,6 @@ wss.on("connection", (connection, req) => {
 	});
 
 	// notify everyone about online people (when someone connected)
-	[...wss.clients].forEach((client) => {
-		client.send(
-			JSON.stringify({
-				online: [...wss.clients].map((c) => ({
-					userId: c.userId,
-					username: c.username,
-				})),
-			})
-		);
-	});
+	notifyAboutOnlinePeople();
 });
+
