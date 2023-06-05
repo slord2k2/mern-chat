@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef, useContext } from "react";
-import Avatar from "./Avatar";
 import Logo from "./Logo";
 import { uniqBy } from "lodash";
 import { UserContext } from "./UserContext";
 import axios from "axios";
+import Contact from "./Contact";
 
 export default function Chat() {
 	const [ws, setWs] = useState(null);
@@ -11,6 +11,7 @@ export default function Chat() {
 	const [selectedUserId, setSelectedUserId] = useState(null);
 	const [newMessageText, setNewMessageText] = useState("");
 	const [messages, setMessages] = useState([]);
+	const [offlinePeople, setOfflinePeople] = useState([]); // [
 	const { username, id } = useContext(UserContext);
 	const divUnderMessages = useRef(null);
 
@@ -33,7 +34,7 @@ export default function Chat() {
 	}
 
 	// helper function to show online people
-	function showONlinePeople(peopleArray) {
+	function showOnlinePeople(peopleArray) {
 		const people = {};
 		peopleArray.forEach(({ userId, username }) => {
 			people[userId] = username;
@@ -45,7 +46,7 @@ export default function Chat() {
 		const messageData = JSON.parse(ev.data);
 		console.log({ ev, messageData });
 		if ("online" in messageData) {
-			showONlinePeople(messageData.online);
+			showOnlinePeople(messageData.online);
 		} else if ("text" in messageData) {
 			setMessages((prev) => [...prev, { ...messageData }]);
 		}
@@ -67,7 +68,7 @@ export default function Chat() {
 				sender: id,
 				recipient: selectedUserId,
 				isOur: true,
-				id: Date.now(),
+				_id: Date.now(),
 			},
 		]);
 	}
@@ -83,6 +84,18 @@ export default function Chat() {
 		}
 	}, [selectedUserId]);
 
+	useEffect(() => {
+		axios.get('/people').then(res=>{
+			const offlinePeopleArr= res.data.filter(p=>p._id !== id).filter(p=> !Object.keys(onlinePeople).includes(p._id));
+			const offlinePeople = {};
+			offlinePeopleArr.forEach((p) => {
+				offlinePeople[p._id] = p;
+			});
+			setOfflinePeople(offlinePeople)
+			// console.log({offlinePeople,offlinePeopleArr});
+		});
+	},[onlinePeople])
+
 	// deleting our user from onlinePeople
 	const onlinePeopleExcludingOurUser = { ...onlinePeople };
 	delete onlinePeopleExcludingOurUser[id];
@@ -95,22 +108,25 @@ export default function Chat() {
 				<Logo />
 				{Object.keys(onlinePeopleExcludingOurUser).map((userId) => (
 					// eslint-disable-next-line react/jsx-key
-					<div
+					<Contact
 						key={userId}
-						onClick={() => setSelectedUserId(userId)}
-						className={
-							"border-b border-gray-100 flex items-center gap-2 cursor-pointer" +
-							(selectedUserId === userId ? " bg-blue-50" : "")
-						}
-					>
-						{userId === selectedUserId && (
-							<div className="w-1 bg-blue-500 h-12 rounded-r-md "></div>
-						)}
-						<div className="flex gap-2 py-2 pl-4 items-center">
-							<Avatar username={onlinePeople[userId]} userId={userId} />
-							<span className="text-gray-800">{onlinePeople[userId]}</span>
-						</div>
-					</div>
+						id={userId}
+						online={true}
+						username={onlinePeopleExcludingOurUser[userId]}
+						onClick={()=>setSelectedUserId(userId)}
+						selected={selectedUserId === userId}
+					/>
+				))}
+				{Object.keys(offlinePeople).map((userId) => (
+					// eslint-disable-next-line react/jsx-key
+					<Contact
+						key={userId}
+						id={userId}
+						online={false}
+						username={offlinePeople[userId].username}
+						onClick={()=>setSelectedUserId(userId)}
+						selected={selectedUserId === userId}
+					/>
 				))}
 			</div>
 
@@ -127,7 +143,7 @@ export default function Chat() {
 								<div className=" overflow-y-scroll absolute top-0 left-0 right-0 bottom-2">
 									{messagesWithoutDupes.map((message) => (
 										<div
-											key={message}
+											key={message._id}
 											className={
 												message.sender === id ? "text-right" : "text-left"
 											}
