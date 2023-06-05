@@ -1,7 +1,6 @@
 // eslint-disable-next-line react/prop-types
 export default function Avatar({userId,username,online}) {
-    const colors =['bg-red-300','bg-zinc-400'
-                    ,'bg-slate-200','bg-orange-200',
+    const colors =['bg-red-300','bg-slate-200','bg-orange-200',
                     'bg-amber-200','bg-yellow-200',
                     'bg-lime-200','bg-green-200',
                     'bg-emerald-700','bg-teal-300',
@@ -18,6 +17,7 @@ export default function Avatar({userId,username,online}) {
             {/* <div className="text-center w-full opacity-70">{username[0]}</div> */}
             <div className="text-center w-full opacity-70">{username[0].toUpperCase()}</div>
             {online && <div className="absolute w-3 h-3 bg-emerald-400 bottom-0 right-0 rounded-full border-white shadow-lg"></div>}
+            {!online && <div className="absolute w-3 h-3 bg-gray-400 bottom-0 right-0 rounded-full border-white shadow-lg"></div>}
 
         </div>
     );
