@@ -189,13 +189,13 @@ wss.on("connection", (connection, req) => {
 	connection.on("message", async (message) => {
 		const messageData = JSON.parse(message.toString());
 		const { recipient, text, file } = messageData;
-		const filename = null;
+		let filename = null;
 		if (file) {
 			const parts = file.name.split(";");
 			const ext = parts[parts.length - 1];
 			filename = Date.now() + "." + ext;
 			const path = __dirname + "/uploads/" + filename;
-			const bufferData = Buffer.from(file.data, "base64");
+			const bufferData = Buffer.from(file.data.split(',')[1], "base64");
 			fs.writeFile(path, bufferData, (err) => {
 				if (err) {
 					console.error("Error saving file:", err);
@@ -204,7 +204,7 @@ wss.on("connection", (connection, req) => {
 				}
 			});
 		}
-		if (recipient && text) {
+		if (recipient && (text || file)) {
 			const messageDoc = await Message.create({
 				sender: connection.userId,
 				recipient,
@@ -219,6 +219,7 @@ wss.on("connection", (connection, req) => {
 							text,
 							recipient,
 							sender: connection.userId,
+							file: file ? filename : null,
 							_id: messageDoc._id,
 						})
 					)

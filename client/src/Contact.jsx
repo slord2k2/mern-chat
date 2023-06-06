@@ -1,5 +1,6 @@
 import Avatar from "./Avatar";
 
+// eslint-disable-next-line react/prop-types
 export default function Contact({id,username,onClick,selected,online}) {
   return (
     <div key={id} onClick={() => onClick(id)}
