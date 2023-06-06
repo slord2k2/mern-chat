@@ -7,6 +7,8 @@ const bodyParser = require("body-parser");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const bcrypt = require("bcrypt");
+const flash = require('express-flash');
+const session = require('express-session');
 const fs = require("fs");
 const ws = require("ws");
 const cors = require("cors");
@@ -101,31 +103,37 @@ app.post("/logout", (req, res) => {
 app.post("/register", async (req, res) => {
 	const { username, password } = req.body;
 	try {
-		const hashedPassword = bcrypt.hashSync(password, bcryptSalt);
-		const createdUser = await User.create({
-			username: username,
-			password: hashedPassword,
-		});
-		jwt.sign(
-			{ userId: createdUser._id, username },
-			jwtSecret,
-			{},
-			(err, token) => {
-				if (err) throw err;
-				res
-					.cookie("token", token, { sameSite: "none", secure: true })
-					.status(201)
-					.json({
-						id: createdUser._id,
-						message: "User created successfully!",
-					});
-			}
-		);
+	  const existingUser = await User.findOne({ username });
+	  if (existingUser) {
+		// Username already exists
+		return res.status(400).json({ alert: "Username already taken, change username or Try Login" });
+	  }
+  
+	  const hashedPassword = bcrypt.hashSync(password, bcryptSalt);
+	  const createdUser = await User.create({
+		username: username,
+		password: hashedPassword,
+	  });
+	  jwt.sign(
+		{ userId: createdUser._id, username },
+		jwtSecret,
+		{},
+		(err, token) => {
+		  if (err) throw err;
+		  res
+			.cookie("token", token, { sameSite: "none", secure: true })
+			.status(201)
+			.json({
+			  id: createdUser._id,
+			  message: "User created successfully!",
+			});
+		}
+	  );
 	} catch (err) {
-		if (err) throw err;
-		res.status(500).json({ message: "Something went wrong!" });
+	  res.status(500).json({ message: "Something went wrong!" });
 	}
-});
+  });
+  
 
 const server = app.listen(3000, () => {
 	console.log("Server listening on port 3000!");
