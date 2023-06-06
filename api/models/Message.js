@@ -7,7 +7,8 @@ const MessageSchema = new mongoose.Schema({
     recipient:{
         type: mongoose.Types.ObjectId,ref:"User"
     },
-    text:String
+    text:String,
+    file:String
 },{timestamps:true});
 
 const MessageModel = mongoose.model("Message",MessageSchema);

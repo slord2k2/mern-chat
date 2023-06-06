@@ -37,9 +37,11 @@ export default function RegisterAndLoginForm() {
 				</button>
 				<div className="text-center mt-2">
 					{isLoginorRegister === "Register" && (
-						<div>
+						<div className="my-2">
 							Already a member?
-							<button onClick={() => setIsLoginorRegister("Login")}>
+							<button
+							className="my-2 mx-3 bg-transparent hover:bg-blue-500 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded"
+							onClick={() => setIsLoginorRegister("Login")}>
 								Login here
 							</button>
 						</div>
@@ -47,7 +49,9 @@ export default function RegisterAndLoginForm() {
 					{isLoginorRegister === "Login" && (
 						<div>
 							Don't have an account?
-							<button onClick={() => setIsLoginorRegister("Register")}>
+							<button
+							className=" my-2 bg-transparent hover:bg-blue-500 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded"
+							onClick={() => setIsLoginorRegister("Register")}>
 								Register here
 							</button>
 						</div>

@@ -7,6 +7,7 @@ const bodyParser = require("body-parser");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const bcrypt = require("bcrypt");
+const fs = require("fs");
 const ws = require("ws");
 const cors = require("cors");
 
@@ -22,23 +23,22 @@ const bcryptSalt = bcrypt.genSaltSync(10);
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
+app.use("/uploads", express.static(__dirname + "/uploads"));
 app.use(cookieParser());
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 
 async function getUserDataFromRequest(req) {
 	return new Promise((resolve, reject) => {
 		const token = req.cookies?.token;
-	if (token) {
-		jwt.verify(token, jwtSecret, {}, (err, userData) => {
-			if (err) throw err;
-			resolve(userData);
-		});
-	}
-	else {
-		reject("no token");
-	}
-	})
-	
+		if (token) {
+			jwt.verify(token, jwtSecret, {}, (err, userData) => {
+				if (err) throw err;
+				resolve(userData);
+			});
+		} else {
+			reject("no token");
+		}
+	});
 }
 
 app.get("/test", (req, res) => {
@@ -47,19 +47,19 @@ app.get("/test", (req, res) => {
 
 app.get("/messages/:userId", async (req, res) => {
 	const { userId } = req.params;
-	const userData=await getUserDataFromRequest(req);
-	const ourUserId=userData.userId;
+	const userData = await getUserDataFromRequest(req);
+	const ourUserId = userData.userId;
 	const messages = await Message.find({
-		sender:{$in:[userId,ourUserId]},
-		recipient:{$in:[userId,ourUserId]}
+		sender: { $in: [userId, ourUserId] },
+		recipient: { $in: [userId, ourUserId] },
 	}).sort({ createdAt: 1 });
 	res.json(messages);
 });
 
-app.get('/people',async (req,res)=>{
-	const users= await User.find({},{'_id':1,username:1});
+app.get("/people", async (req, res) => {
+	const users = await User.find({}, { _id: 1, username: 1 });
 	res.json(users);
-})
+});
 
 app.get("/profile", (req, res) => {
 	const token = req.cookies?.token;
@@ -72,6 +72,7 @@ app.get("/profile", (req, res) => {
 		res.status(401).json("no token");
 	}
 });
+
 app.post("/login", async (req, res) => {
 	const { username, password } = req.body;
 	const foundUser = await User.findOne({ username });
@@ -90,10 +91,13 @@ app.post("/login", async (req, res) => {
 			);
 		}
 	}
-	// if (!foundUser) {
-	// 	res.status(401).json({ message: "User not found!" });
-	// }
 });
+
+app.post("/logout", (req, res) => {
+	res.clearCookie("token").json({ message: "logout Successful" });
+	// res.cookie('token','',{samSite:'none',secure:true}).json({message:'logout'});
+});
+
 app.post("/register", async (req, res) => {
 	const { username, password } = req.body;
 	try {
@@ -130,7 +134,7 @@ const server = app.listen(3000, () => {
 // read username and id form the cookie for this connection
 const wss = new ws.WebSocketServer({ server });
 wss.on("connection", (connection, req) => {
-	function notifyAboutOnlinePeople(){
+	function notifyAboutOnlinePeople() {
 		[...wss.clients].forEach((client) => {
 			client.send(
 				JSON.stringify({
@@ -143,17 +147,18 @@ wss.on("connection", (connection, req) => {
 		});
 	}
 	connection.isAlive = true;
-	connection.timer=setInterval(() => {
-			connection.ping();
-			connection.deathTimer=setTimeout(() => {
-				connection.isAlive=false;
-				connection.terminate();
-				notifyAboutOnlinePeople();
-			},1000)
-	},3000)
-	connection.on('pong',()=>{
+	connection.timer = setInterval(() => {
+		connection.ping();
+		connection.deathTimer = setTimeout(() => {
+			connection.isAlive = false;
+			clearInterval(connection.timer);
+			connection.terminate();
+			notifyAboutOnlinePeople();
+		}, 1000);
+	}, 10000);
+	connection.on("pong", () => {
 		clearTimeout(connection.deathTimer);
-	})
+	});
 
 	const cookie = req.headers.cookie;
 	if (cookie) {
@@ -175,12 +180,28 @@ wss.on("connection", (connection, req) => {
 
 	connection.on("message", async (message) => {
 		const messageData = JSON.parse(message.toString());
-		const { recipient, text } = messageData;
+		const { recipient, text, file } = messageData;
+		const filename = null;
+		if (file) {
+			const parts = file.name.split(";");
+			const ext = parts[parts.length - 1];
+			filename = Date.now() + "." + ext;
+			const path = __dirname + "/uploads/" + filename;
+			const bufferData = Buffer.from(file.data, "base64");
+			fs.writeFile(path, bufferData, (err) => {
+				if (err) {
+					console.error("Error saving file:", err);
+				} else {
+					console.log("File saved:", path);
+				}
+			});
+		}
 		if (recipient && text) {
 			const messageDoc = await Message.create({
 				sender: connection.userId,
 				recipient,
 				text,
+				file: file ? filename : null,
 			});
 			[...wss.clients]
 				.filter((c) => c.userId === recipient)
@@ -200,4 +221,3 @@ wss.on("connection", (connection, req) => {
 	// notify everyone about online people (when someone connected)
 	notifyAboutOnlinePeople();
 });
-

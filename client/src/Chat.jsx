@@ -12,9 +12,8 @@ export default function Chat() {
 	const [newMessageText, setNewMessageText] = useState("");
 	const [messages, setMessages] = useState([]);
 	const [offlinePeople, setOfflinePeople] = useState([]); // [
-	const { username, id } = useContext(UserContext);
+	const { username, id, setId, setUsername } = useContext(UserContext);
 	const divUnderMessages = useRef(null);
-
 
 	// connecting to the websocket
 	useEffect(() => {
@@ -51,13 +50,24 @@ export default function Chat() {
 			setMessages((prev) => [...prev, { ...messageData }]);
 		}
 	}
+
+	// logout function
+	function logout() {
+		axios.post("/logout").then(() => {
+			setWs(null);
+			setId(null);
+			setUsername(null);
+		});
+	}
+
 	// function triggered when the form(submit) is submitted to send message.
-	function sendMessage(ev) {
-		ev.preventDefault();
+	function sendMessage(ev,file=null) {
+		if(ev)ev.preventDefault();
 		ws.send(
 			JSON.stringify({
 				recipient: selectedUserId,
 				text: newMessageText,
+				file,
 			})
 		);
 		setNewMessageText("");
@@ -71,30 +81,49 @@ export default function Chat() {
 				_id: Date.now(),
 			},
 		]);
+		if(file){
+			axios.get('/messages/'+selectedUserId).then(res=>{
+				setMessages(res.data);
+			})
+		}
 	}
+
+	function sendFile(ev){
+		const reader=new FileReader(ev);
+		reader.readAsDataURL(ev.target.files[0]);
+		reader.onload=()=>{
+			sendMessage(null,{
+				name:ev.target.files[0].name,
+				data:reader.result
+			});
+		}
+	}
+
 	useEffect(() => {
 		const div = divUnderMessages.current;
 		if (div) div.scrollIntoView({ behavior: "smooth", block: "end" });
 	}, [messages]);
 	useEffect(() => {
 		if (selectedUserId) {
-			axios.get('/messages/'+selectedUserId).then(res=>{
+			axios.get("/messages/" + selectedUserId).then((res) => {
 				setMessages(res.data);
 			}); // get messages from the server
 		}
 	}, [selectedUserId]);
 
 	useEffect(() => {
-		axios.get('/people').then(res=>{
-			const offlinePeopleArr= res.data.filter(p=>p._id !== id).filter(p=> !Object.keys(onlinePeople).includes(p._id));
+		axios.get("/people").then((res) => {
+			const offlinePeopleArr = res.data
+				.filter((p) => p._id !== id)
+				.filter((p) => !Object.keys(onlinePeople).includes(p._id));
 			const offlinePeople = {};
 			offlinePeopleArr.forEach((p) => {
 				offlinePeople[p._id] = p;
 			});
-			setOfflinePeople(offlinePeople)
+			setOfflinePeople(offlinePeople);
 			// console.log({offlinePeople,offlinePeopleArr});
 		});
-	},[onlinePeople])
+	}, [onlinePeople]);
 
 	// deleting our user from onlinePeople
 	const onlinePeopleExcludingOurUser = { ...onlinePeople };
@@ -104,30 +133,56 @@ export default function Chat() {
 
 	return (
 		<div className="flex h-screen">
-			<div className="bg-white w-1/3">
-				<Logo />
-				{Object.keys(onlinePeopleExcludingOurUser).map((userId) => (
-					// eslint-disable-next-line react/jsx-key
-					<Contact
-						key={userId}
-						id={userId}
-						online={true}
-						username={onlinePeopleExcludingOurUser[userId]}
-						onClick={()=>setSelectedUserId(userId)}
-						selected={selectedUserId === userId}
-					/>
-				))}
-				{Object.keys(offlinePeople).map((userId) => (
-					// eslint-disable-next-line react/jsx-key
-					<Contact
-						key={userId}
-						id={userId}
-						online={false}
-						username={offlinePeople[userId].username}
-						onClick={()=>setSelectedUserId(userId)}
-						selected={selectedUserId === userId}
-					/>
-				))}
+			<div className="bg-white w-1/3 flex flex-col">
+				<div className="flex-grow">
+					<Logo />
+					{Object.keys(onlinePeopleExcludingOurUser).map((userId) => (
+						// eslint-disable-next-line react/jsx-key
+						<Contact
+							key={userId}
+							id={userId}
+							online={true}
+							username={onlinePeopleExcludingOurUser[userId]}
+							onClick={() => setSelectedUserId(userId)}
+							selected={selectedUserId === userId}
+						/>
+					))}
+					{Object.keys(offlinePeople).map((userId) => (
+						// eslint-disable-next-line react/jsx-key
+						<Contact
+							key={userId}
+							id={userId}
+							online={false}
+							username={offlinePeople[userId].username}
+							onClick={() => setSelectedUserId(userId)}
+							selected={selectedUserId === userId}
+						/>
+					))}
+				</div>
+				<div className="p-2 text-center flex items-center justify-center">
+					<span className="mr-2 text-sm text-gray-700 flex items-center">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="currentColor"
+							className="w-6 h-6"
+						>
+							<path
+								fillRule="evenodd"
+								d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z"
+								clipRule="evenodd"
+							/>
+						</svg>
+
+						{username}
+					</span>
+					<button
+						onClick={logout}
+						className="text-sm text-gray-500 bg-blue-100 py-2 border rounded-sm "
+					>
+						logout
+					</button>
+				</div>
 			</div>
 
 			<div className="flex flex-col bg-blue-50 w-2/3 p-2">
@@ -153,10 +208,17 @@ export default function Chat() {
 													"text-left inline-block p-2 my-2 rounded-md text-sm " +
 													(message.sender === id
 														? "bg-blue-500 text-white"
-														: "bg-white text-gray-500")
+														: "bg-white text-gray-700")
 												}
 											>
 												{message.text}
+												{message.file && (
+													<div>
+														<a href={axios.defaults.baseURL+'/'+message.file}>
+															{message.file}
+														</a>
+													</div>
+												)}
 											</div>
 										</div>
 									))}
@@ -175,6 +237,23 @@ export default function Chat() {
 							placeholder="Type your message here"
 							className="bg-white border p-2 flex-grow"
 						/>
+						<label className="bg-blue-400 p-2 text-gray-600 cursor-pointer rounded-sm border border-blue-200">
+							<input type="file"className="hidden" onChange={sendFile} />
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								strokeWidth={1.5}
+								stroke="currentColor"
+								className="w-6 h-6"
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"
+								/>
+							</svg>
+						</label>
 						<button
 							type="submit"
 							className="bg-blue-500 p-2 text-white rounded-sm"
