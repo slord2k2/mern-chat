@@ -93,6 +93,9 @@ app.post("/login", async (req, res) => {
 			);
 		}
 	}
+	else{
+		res.status(404).json({ alert: "User not found. Please sign up." });
+	}
 });
 
 app.post("/logout", (req, res) => {
