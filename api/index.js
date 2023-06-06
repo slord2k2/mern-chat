@@ -92,6 +92,9 @@ app.post("/login", async (req, res) => {
 				}
 			);
 		}
+		else{
+			res.status(401).json({ alert: "Wrong password" });
+		}
 	}
 	else{
 		res.status(404).json({ alert: "User not found. Please sign up." });
